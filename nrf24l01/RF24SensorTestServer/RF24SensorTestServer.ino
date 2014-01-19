@@ -37,11 +37,11 @@ Message message;
      {
          if(strcmp("motion/1", (char *) message.payload) == 0)
          {
-            digitalWrite(led2, HIGH);
+            digitalWrite(led, HIGH);
          }
          if(strcmp("motion/0", (char *) message.payload) == 0)
          {
-            digitalWrite(led2, LOW);
+            digitalWrite(led, LOW);
          }
      }
   }

@@ -104,7 +104,7 @@ void checkIrSensor()
         Serial.println(results.value, HEX);
         Message message;
         message.type = 4; 
-        sprintf((char*)message.payload, "ir/%#010x\n",results.value );
+        sprintf((char*)message.payload, "ir/0x%.8X",results.value );
         sensor.send(message, (byte *) serverAddr);
       }
   } 
