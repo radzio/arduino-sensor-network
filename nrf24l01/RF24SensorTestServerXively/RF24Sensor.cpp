@@ -32,10 +32,12 @@ void RF24Sensor::config()
   void RF24Sensor::send(Message message, byte * toAddress)
   {
     Mirf.setTADDR(toAddress);
+    
     memcpy(message.addr, addr, 5);
+
     Mirf.send((byte *) &message);
 
-     while(Mirf.isSending()){
+    while(Mirf.isSending()){
        //Serial.println("sending");
      }
   }

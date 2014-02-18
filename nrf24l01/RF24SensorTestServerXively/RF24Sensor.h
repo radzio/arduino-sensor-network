@@ -14,6 +14,24 @@
 
 
 typedef struct {
+      float temperature;
+      float humidity;
+    } DhtPayload;
+    
+typedef struct {
+      float temperature;
+    } TemperaturePayload;
+    
+typedef struct {
+       uint8_t motion;
+    } MotionPayload;
+    
+typedef struct {
+       unsigned long irResult;
+    } IrPayload;
+
+
+typedef struct {
       byte addr[5];
       uint8_t type;
       byte payload[26];

@@ -28,12 +28,32 @@ RF24Sensor sensor(8,7, (byte *)"clie1");
 
 void setup(){
   Serial.begin(9600);
+  Serial.println(sizeof(DhtPayload));
+  Serial.println(sizeof(TemperaturePayload));
+  Serial.println(sizeof(MotionPayload));
+  Serial.println(sizeof(IrPayload));
   sensor.config();
   initalizePirSensor();
   dht.begin();
   
   irrecv.enableIRIn(); // Start the receiver
 }
+
+
+void printMessage(Message message)
+{
+  Serial.print("Message from: ");
+  Serial.print((char)message.addr[0]); 
+  Serial.print((char)message.addr[1]); 
+  Serial.print((char)message.addr[2]); 
+  Serial.print((char)message.addr[3]); 
+  Serial.print((char)message.addr[4]);
+  Serial.print(" type: ");
+  Serial.print(message.type);
+  Serial.print(" ");
+  //Serial.println((char *) message.payload);
+}
+
 
 void loop()
 {
@@ -75,20 +95,18 @@ void checkDHTSensor()
   } 
   else 
   {
-    Serial.println(t); // Wyświetlenie linijki z temperaturą
-    Serial.println(h); // Wyświetlenie linijki z wilgotnością
     Message message;
     message.type = 3;
-   
-    char tBuffer[10];
-    char hBuffer[10];  
-    
-    dtostrf(t, 4, 2, tBuffer); 
-    dtostrf(h, 4, 2, hBuffer); 
-   
-    sprintf((char*)message.payload, "t/%s/h/%s", tBuffer, hBuffer);
+    DhtPayload dhtPayload;
+    dhtPayload.temperature = t;
+    dhtPayload.humidity = h;
 
+    memcpy(message.payload, &dhtPayload , sizeof(DhtPayload));
     sensor.send(message, (byte *) serverAddr);
+    //printMessage(message);
+    //memcpy(&dhtPayload, message.payload, sizeof(dhtPayload));
+    //Serial.println( ((DhtPayload*)message.payload)->humidity);
+    //Serial.println( ((DhtPayload*)message.payload)->temperature);
     lastDHTReading = millis();
   } 
 }
@@ -104,7 +122,10 @@ void checkIrSensor()
         Serial.println(results.value, HEX);
         Message message;
         message.type = 4; 
-        sprintf((char*)message.payload, "ir/0x%.8X",results.value );
+        IrPayload irPayload;
+        irPayload.irResult = results.value;
+        memcpy(message.payload, &irPayload , sizeof(DhtPayload));
+        
         sensor.send(message, (byte *) serverAddr);
       }
   } 
@@ -112,6 +133,7 @@ void checkIrSensor()
 
 void checkPirSensor()
 {
+  MotionPayload motionPayload;
   if(digitalRead(pirPin) == HIGH)
   {
   
@@ -121,7 +143,8 @@ void checkPirSensor()
       lockLow = false;  
       Message message;
       message.type = 2;
-      sprintf((char*)message.payload, "motion/%d", 1);
+      motionPayload.motion = 1;
+      memcpy(message.payload, &motionPayload , sizeof(MotionPayload));
       sensor.send(message, (byte *) serverAddr);
       
     }         
@@ -142,7 +165,8 @@ void checkPirSensor()
       lockLow = true;  
       Message message;
       message.type = 2;
-      sprintf((char*)message.payload, "motion/%d", 0);  
+      motionPayload.motion = 0;
+      memcpy(message.payload, &motionPayload , sizeof(MotionPayload)); 
       sensor.send(message, (byte *) serverAddr);      
     }
   } 
