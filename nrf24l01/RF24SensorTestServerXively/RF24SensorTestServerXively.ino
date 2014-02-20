@@ -256,9 +256,9 @@ void printMessage(Message message)
 	//tft.drawLine(20, 50, 98, 50, ST7735_GREEN);
 	
 if(ethOk == true)
-        tft.fillCircle(2, 128 - 10, 10, ST7735_GREEN);
+        tft.fillCircle(12, 128 - 12, 10, ST7735_GREEN);
         else
-         tft.fillCircle(2, 128 - 10, 10, ST7735_RED);
+         tft.fillCircle(12, 128 - 12, 10, ST7735_RED);
 
 	switch (message.type)
 	{
