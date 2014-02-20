@@ -118,7 +118,7 @@ RF24Sensor sensor(4, 3, (byte *)"serv1");
 Adafruit_ST7735 tft = Adafruit_ST7735(cs, dc, rst);
 float p = 3.1415926;
 
-
+boolean ethOk = false;
 int devices[3] = { nrf, tftDevice, lan };
 
 void enableSPIDevice(int pin)
@@ -161,10 +161,11 @@ void setup(){
 
 	if (ether.begin(sizeof Ethernet::buffer, mymac, 5) == 0)
 	{
-		DEBUG_PRINTF("Failed to access Ethernet controller");
+		DEBUG_PRINTFLN("Failed to access Ethernet controller");
 	}
 	else
 	{
+                ethOk = true;
 		DEBUG_PRINTFLN("Ethernet controller initialized ");
 	}
 #if STATIC
@@ -210,6 +211,11 @@ void setup(){
 	tft.setCursor(lineSpacing, y);
 	tft.setTextColor(ST7735_GREEN);
 	tft.print("Starting radio...");
+if(!ethOk){
+	y += (lineHeight + lineSpacing);
+	tft.setCursor(lineSpacing, y);
+	tft.setTextColor(ST7735_RED);
+	tft.print("Etherned failed...");}
 
 	delay(3000);
 	enableSPIDevice(nrf);
@@ -232,6 +238,7 @@ void printMessage(Message message)
 
 
 	enableSPIDevice(tftDevice);
+
 	tft.fillScreen(ST7735_BLACK);
 	tft.setRotation(3);
 	tft.setTextSize(1);
@@ -248,6 +255,10 @@ void printMessage(Message message)
 	//drawLine(x_start,y_start,x_ende,y_ende,farbe);
 	//tft.drawLine(20, 50, 98, 50, ST7735_GREEN);
 	
+if(ethOk == true)
+        tft.fillCircle(2, 128 - 10, 10, ST7735_GREEN);
+        else
+         tft.fillCircle(2, 128 - 10, 10, ST7735_RED);
 
 	switch (message.type)
 	{
