@@ -5,7 +5,10 @@
 #include <Mirf.h>
 #include <nRF24L01.h>
 #include <MirfHardwareSpiDriver.h>
+#define DEBUG
 #include "RF24Sensor.h"
+#include "DebugUtils.h"
+#include "MilliTimer.h"
 
 #include <EtherCard.h>
 
@@ -47,34 +50,9 @@ char page[] PROGMEM =
 //Program:   21222 bytes (64.8% Full)
 
 //Data:       1406 bytes(68.7% Full)
-//#define DEBUG;
-
-#ifdef DEBUG
-	#define DEBUG_PRINT(x) Serial.print (x);
-	#define DEBUG_PRINTF(x) Serial.print (F(x));
-	#define DEBUG_PRINTFLN(x) Serial.println (F(x));
-	#define DEBUG_PRINTDEC(x) Serial.print (x, DEC);
-	#define DEBUG_PRINTLN(x) Serial.println (x);
-#else
-	#define DEBUG_PRINT(x)
-	#define DEBUG_PRINTF(x)
-	#define DEBUG_PRINTDEC(x)
-	#define DEBUG_PRINTLN(x) 
-	#define DEBUG_PRINTFLN(x);
-#endif 
+#define DEBUG;
 
 
-
-#define DEBUG_PRINT_DETAILS(str)        \
-	Serial.print(millis());     \
-	Serial.print(": ");         \
-	Serial.print(__PRETTY_FUNCTION__); \
-	Serial.print(' ');          \
-	Serial.print(__FILE__);     \
-	Serial.print(':');          \
-	Serial.print(__LINE__);     \
-	Serial.print(' ');          \
-	Serial.println(str);
 
 
 char website[] PROGMEM = "api.xively.com";
@@ -99,6 +77,9 @@ const uint8_t lineHeight = 8;
 const uint8_t lineSpacing = 4;
 const uint8_t charWidth = 2;
 
+MilliTimer dht11;
+MilliTimer bmp;
+
 int getNextLineY(int lineY)
 {
 	return lineY + 10;
@@ -106,6 +87,10 @@ int getNextLineY(int lineY)
 
 int lastX ;
 int lastY = lineSpacing;
+
+long unsigned int m3Last = 0;   
+long unsigned int m5Last = 23000;
+long unsigned int pause = 5000;
 
 #if defined(__SAM3X8E__)
 #undef __FlashStringHelper::F(string_literal)
@@ -135,7 +120,8 @@ void enableSPIDevice(int pin)
 
 
 
-void setup(){
+void setup()
+{
 #ifdef DEBUG
 	Serial.begin(9600);
 #endif
@@ -159,15 +145,16 @@ void setup(){
 	
 	enableSPIDevice(lan);
 
-	if (ether.begin(sizeof Ethernet::buffer, mymac, 5) == 0)
+	/*if (ether.begin(sizeof Ethernet::buffer, mymac, 5) == 0)
 	{
 		DEBUG_PRINTFLN("Failed to access Ethernet controller");
 	}
 	else
 	{
-                ethOk = true;
+        ethOk = true;
 		DEBUG_PRINTFLN("Ethernet controller initialized ");
-	}
+	}*/
+	ether.persistTcpConnection(true);
 #if STATIC
 	ether.staticSetup(myip, gwip);
 #else
@@ -183,7 +170,7 @@ void setup(){
 	static byte dnsip[] = { 8, 8, 4, 4 };
 	ether.copyIp(ether.dnsip, dnsip);
 	static byte hisip[] = { 216, 52, 233, 120 };
-
+	//static byte hisip[] = { 10, 89, 9, 128 };
 
 	  //if (!ether.dnsLookup(website))
 	  //{
@@ -211,14 +198,17 @@ void setup(){
 	tft.setCursor(lineSpacing, y);
 	tft.setTextColor(ST7735_GREEN);
 	tft.print("Starting radio...");
-if(!ethOk){
-	y += (lineHeight + lineSpacing);
-	tft.setCursor(lineSpacing, y);
-	tft.setTextColor(ST7735_RED);
-	tft.print("Etherned failed...");}
+
+	if(!ethOk)
+	{
+		y += (lineHeight + lineSpacing);
+		tft.setCursor(lineSpacing, y);
+		tft.setTextColor(ST7735_RED);
+		tft.print("Etherned failed...");
+	}
 
 	delay(3000);
-	enableSPIDevice(nrf);
+	enableSPIDevice(lan);
 }
 
 
@@ -255,13 +245,20 @@ void printMessage(Message message)
 	//drawLine(x_start,y_start,x_ende,y_ende,farbe);
 	//tft.drawLine(20, 50, 98, 50, ST7735_GREEN);
 	
-if(ethOk == true)
-        tft.fillCircle(12, 128 - 12, 10, ST7735_GREEN);
-        else
-         tft.fillCircle(12, 128 - 12, 10, ST7735_RED);
+	if (ethOk == true)
+	{
+		tft.fillCircle(12, 128 - 12, 10, ST7735_GREEN);
+	}
+	else
+	{
+		tft.fillCircle(12, 128 - 12, 10, ST7735_RED);
+	}
 
 	switch (message.type)
 	{
+	case 0:
+
+	break;
 	case 1:
 
 		break;
@@ -300,6 +297,12 @@ if(ethOk == true)
 		tft.setTextColor(ST7735_YELLOW);
 		tft.print(((IrPayload*)message.payload)->irResult, HEX);
 		break;
+    case 5:
+		tft.setCursor(20, 65);
+		tft.setTextColor(ST7735_YELLOW);
+  
+		tft.print(((BmpPayload*)message.payload)->pressure);
+		break;
 	}
 
 
@@ -310,26 +313,59 @@ if(ethOk == true)
 
 void loop()
 {
+	enableSPIDevice(lan);
+	handleHttpRequest();
+	enableSPIDevice(nrf);
 	Message message;
-
 	message = sensor.receive();
-	if (message.type == 0)
-	{
-		//Serial.println("No message"); 
-		//     Serial.println((char *)message.payload); 
-		//     Serial.println((char *)message.addr); 
-	}
-	else
+
+	//handleHttpRequest();
+	
+	if (message.type != 0)
 	{
 		printMessage(message);
-	}
+		/*enableSPIDevice(lan);
 
+		if (stash.freeCount() <= 40) {
+			DEBUG_PRINTLN(">>>>>>>>>>CLEAN STASH<<<<<<<:");
+			Stash::initMap(56);
+		}
+
+		if (message.type == 2)
+		{
+			enableSPIDevice(lan);
+			sendMotionMessage((MotionPayload*)message.payload);
+		}
+
+		if (message.type == 5)
+		{
+			enableSPIDevice(lan);
+			sendBmpMessage((BmpPayload*)message.payload);
+		}
+
+
+		if (message.type == 3)
+		{
+			enableSPIDevice(lan);
+			sendDhtMessage((DhtPayload*)message.payload);
+		}
+		delay(700);*/
+	}
+	
+
+
+	enableSPIDevice(nrf);
+}
+
+void handleHttpRequest()
+{
 	enableSPIDevice(lan);
 
 	if (Stash::freeCount()<5){ // reset EtherCard stash if running low
 		Stash::initMap(56);
-	}
+		DEBUG_PRINTF("--------------------Cleaning stash-------------------");
 
+	}
 
 	if (ether.packetLoop(ether.packetReceive())) {
 		DEBUG_PRINTF("receive packet");
@@ -344,17 +380,26 @@ void loop()
 		tft.print(F("New HTTP REQUEST"));
 		enableSPIDevice(lan);
 	}
+}
 
-	if (message.type == 3)
-	{
+void sendBmpMessage(BmpPayload* payload)
+{
+		if (!bmp.poll(10000))
+		{
+			return;
+		}
+		//ether.packetLoop(ether.packetReceive());
+		//ether.packetLoop(ether.packetReceive());
+		stash.cleanup();
 		byte sd = stash.create();
-		stash.print("temperatura,");
-		stash.println(((DhtPayload*)message.payload)->temperature);
-		DEBUG_PRINTLN(((DhtPayload*)message.payload)->temperature);
-		DEBUG_PRINTLN(((DhtPayload*)message.payload)->humidity);
-		stash.print("wilgotnosc,");
-		stash.println(((DhtPayload*)message.payload)->humidity);
+		stash.print("temperatura2,");
+		stash.println(payload->temperature);
+		stash.print("cisnienie,");
+		stash.println(payload->pressure);
 		stash.save();
+
+		DEBUG_PRINTLN(payload->temperature);
+		DEBUG_PRINTLN(payload->pressure);
 
 		Stash::prepare(PSTR("PUT http://$F/v2/feeds/$F.csv HTTP/1.0" "\r\n"
 			"Host: $F" "\r\n"
@@ -365,10 +410,94 @@ void loop()
 			website, PSTR(FEED), website, PSTR(APIKEY), stash.size(), sd);
 
 		// send the packet - this also releases all stash buffers once done
-		ether.tcpSend();
-		DEBUG_PRINTFLN("tcp send");
-	}
-
-	enableSPIDevice(nrf);
+		DEBUG_PRINTFLN("Sending... BMP");
+		/*byte sessionId = ether.tcpSend();
+		long last = millis();
+		const char * reply;
+		do
+		{
+			if (millis() - last > 3000)
+				break;
+			
+			ether.packetLoop(ether.packetReceive());
+			Serial.print(".");
+			const char * reply = ether.tcpReply(sessionId);
+		} while (reply == 0);
+		Serial.println("reply: ");
+		Serial.println(reply);*/
+		/*while (ether.tcpReply(sessionId) == 0)
+		{
+			ether.packetLoop(ether.packetReceive());
+			Serial.print(".");
+		}
+		const char* reply = ether.tcpReply(sessionId);
+		if (reply > 0) {
+			Serial.print("reply: ");
+			Serial.println(reply);
+		}*/
+		ether.packetLoop(ether.packetReceive());
+		DEBUG_PRINTFLN("Sent... BMP");
 }
+
+void sendDhtMessage(DhtPayload* payload)
+{
+	if (!dht11.poll(10000))
+	{
+		return;
+	}
+	//ether.packetLoop(ether.packetReceive());
+	stash.cleanup();
+	byte sd = stash.create();
+	stash.print("temperatura,");
+	stash.println(payload->temperature);
+	stash.print("wilgotnosc,");
+	stash.println(payload->humidity);
+	stash.save();
+
+	DEBUG_PRINTLN(payload->temperature);
+	DEBUG_PRINTLN(payload->humidity);
+
+	Stash::prepare(PSTR("PUT http://$F/v2/feeds/$F.csv HTTP/1.0" "\r\n"
+		"Host: $F" "\r\n"
+		"X-ApiKey: $F" "\r\n"
+		"Content-Length: $D" "\r\n"
+		"\r\n"
+		"$H"),
+		website, PSTR(FEED), website, PSTR(APIKEY), stash.size(), sd);
+
+	// send the packet - this also releases all stash buffers once done
+	DEBUG_PRINTFLN("Sending... DHT");
+	ether.tcpSend();
+	ether.packetLoop(ether.packetReceive());
+	DEBUG_PRINTFLN("Sent... DHT");
+}
+
+void sendMotionMessage(MotionPayload* payload)
+{
+	//ether.packetLoop(ether.packetReceive());
+	stash.cleanup();
+	byte sd = stash.create();
+	stash.print("motion,");
+	stash.println(payload->motion);
+	stash.save();
+
+	DEBUG_PRINTLN(payload->motion);
+
+	Stash::prepare(PSTR("PUT http://$F/v2/feeds/$F.csv HTTP/1.0" "\r\n"
+		"Host: $F" "\r\n"
+		"X-ApiKey: $F" "\r\n"
+		"Content-Length: $D" "\r\n"
+		"\r\n"
+		"$H"),
+		website, PSTR(FEED), website, PSTR(APIKEY), stash.size(), sd);
+
+	// send the packet - this also releases all stash buffers once done
+	DEBUG_PRINTFLN("Sending... MOTION");
+	ether.tcpSend();
+	ether.packetLoop(ether.packetReceive());
+	DEBUG_PRINTFLN("Sent... MOTION");
+}
+
+
+
 

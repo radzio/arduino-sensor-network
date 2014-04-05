@@ -19,6 +19,11 @@ typedef struct {
     
 typedef struct {
       float temperature;
+      float pressure;
+    } BmpPayload;
+    
+typedef struct {
+      float temperature;
     } TemperaturePayload;
     
 typedef struct {

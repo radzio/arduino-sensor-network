@@ -12,11 +12,15 @@
 #include <nRF24L01.h>
 #include <MirfHardwareSpiDriver.h>
 
-
 typedef struct {
       float temperature;
       float humidity;
     } DhtPayload;
+    
+typedef struct {
+      float temperature;
+      float pressure;
+    } BmpPayload;
     
 typedef struct {
       float temperature;
@@ -29,7 +33,6 @@ typedef struct {
 typedef struct {
        unsigned long irResult;
     } IrPayload;
-
 
 typedef struct {
       byte addr[5];

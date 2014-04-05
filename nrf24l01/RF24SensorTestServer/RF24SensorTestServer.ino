@@ -5,16 +5,35 @@
 #include <MirfHardwareSpiDriver.h>
 #include "RF24Sensor.h"
 
+#define DEBUG_PRINT(x) Serial.print (x);
+#define DEBUG_PRINTF(x) Serial.print (F(x));
+#define DEBUG_PRINTFLN(x) Serial.println (F(x));
+#define DEBUG_PRINTDEC(x) Serial.print (x, DEC);
+#define DEBUG_PRINTLN(x) Serial.println (x);
+
+
+
+#define DEBUG_PRINT_DETAILS(str)        \
+	Serial.print(millis());     \
+	Serial.print(": ");         \
+	Serial.print(__PRETTY_FUNCTION__); \
+	Serial.print(' ');          \
+	Serial.print(__FILE__);     \
+	Serial.print(':');          \
+	Serial.print(__LINE__);     \
+	Serial.print(' ');          \
+	Serial.println(str);
+
 int led = 3;
 
-RF24Sensor sensor(48,49, (byte *)"serv1");
+RF24Sensor sensor(6,7, (byte *)"serv1");
 
 void setup(){
   Serial.begin(9600);
   Serial.print("Message size ");
   Serial.println(sizeof(Message));
   
-  pinMode(led, OUTPUT); 
+  //pinMode(led, OUTPUT); 
   
   sensor.config();
 }
@@ -51,16 +70,17 @@ Message message;
 
 void printMessage(Message message)
 {
-  Serial.print("Message from: ");
-  Serial.print((char)message.addr[0]); 
-  Serial.print((char)message.addr[1]); 
-  Serial.print((char)message.addr[2]); 
-  Serial.print((char)message.addr[3]); 
-  Serial.print((char)message.addr[4]);
-  Serial.print(" type: ");
-  Serial.print(message.type);
-  Serial.print(" ");
-  Serial.println((char *) message.payload);
+
+	DEBUG_PRINTF("Message from: ");
+	DEBUG_PRINT((char)message.addr[0]);
+	DEBUG_PRINT((char)message.addr[1]);
+	DEBUG_PRINT((char)message.addr[2]);
+	DEBUG_PRINT((char)message.addr[3]);
+	DEBUG_PRINT((char)message.addr[4]);
+	DEBUG_PRINTF(" type: ");
+	DEBUG_PRINT(message.type);
+	DEBUG_PRINTF(" ");
+	DEBUG_PRINTLN((char *)message.payload);
  
   
 }

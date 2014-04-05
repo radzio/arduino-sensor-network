@@ -1,3 +1,7 @@
+#include <Wire.h>
+
+#include <Adafruit_BMP085.h>
+
 
 #include <SPI.h>
 #include <Mirf.h>
@@ -25,6 +29,7 @@ boolean takeLowTime;
 char * serverAddr = "serv1";
 
 RF24Sensor sensor(8,7, (byte *)"clie1");
+Adafruit_BMP085 bmp;
 
 void setup(){
   Serial.begin(9600);
@@ -37,6 +42,9 @@ void setup(){
   dht.begin();
   
   irrecv.enableIRIn(); // Start the receiver
+  
+  
+  initializeBmpSensor();
 }
 
 
@@ -60,6 +68,16 @@ void loop()
   checkPirSensor();
   checkDHTSensor();
   checkIrSensor();
+  checkBmpSensor();
+}
+
+
+void initializeBmpSensor()
+{
+  if (!bmp.begin()) {
+      Serial.println("Could not find a valid BMP085 sensor, check wiring!");
+      while (1) {}
+    }
 }
 
 
@@ -80,6 +98,32 @@ void initalizePirSensor()
 
 long unsigned int lastDHTReading = 0;   
 long unsigned int DHTPause = 5000;
+
+
+long unsigned int lastBMPReading = 0;   
+//long unsigned int DHTPause = 5000;
+void checkBmpSensor()
+{
+  if(millis() - lastBMPReading < DHTPause) 
+  {
+    return;
+  }
+   float pressure = (bmp.readPressure() / 100.0);
+   float temperature = bmp.readTemperature();
+   
+    Message message;
+    message.type = 5;
+    BmpPayload bmpPayload;
+    bmpPayload.temperature = temperature;
+    bmpPayload.pressure = pressure;
+
+    memcpy(message.payload, &bmpPayload , sizeof(bmpPayload));
+    sensor.send(message, (byte *) serverAddr);
+   
+   
+   lastBMPReading = millis();
+}
+
 
 void checkDHTSensor()
 {

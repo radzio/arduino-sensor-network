@@ -26,6 +26,7 @@ void RF24Sensor::config()
   Mirf.setRADDR(addr);
   Mirf.payload = sizeof(Message);
   Mirf.config(); 
+  Serial.println(Mirf.getStatus());
 }
 
 
